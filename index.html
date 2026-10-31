@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><title>霧鎖王國開服工具</title>
+<style>
+:root{--bg:#0d1420;--panel:#141d2d;--panel2:#1a2538;--line:#25324a;--tx:#e6edf7;--mu:#8b9bb4;--ac:#7cc4f0;--acd:#2b6a97;--ok:#5cc98a;--er:#ef6b61;--wa:#e8b85a}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:grid;grid-template-columns:176px 1fr;background:var(--bg);color:var(--tx);font:14px/1.5 "Microsoft JhengHei","Segoe UI",sans-serif}
+nav{background:#0a101a;border-right:1px solid var(--line);padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+nav h1{font-size:15px;margin:0 8px 14px;color:var(--ac)}
+nav button{all:unset;cursor:pointer;padding:9px 12px;border-radius:8px;color:var(--mu)}
+nav button:hover{background:var(--panel)}nav button.on{background:var(--panel2);color:var(--tx);box-shadow:inset 3px 0 var(--ac)}
+nav .st{margin-top:auto;padding:8px 12px;font-size:12px;color:var(--mu)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--mu);margin-right:6px}
+.dot.running{background:var(--ok)}.dot.starting,.dot.stopping{background:var(--wa)}
+main{display:flex;flex-direction:column;min-width:0;height:100vh}
+.pages{flex:1;overflow:auto;padding:20px 24px}
+.page{display:none;max-width:760px}.page.on{display:block}
+h2{font-size:17px;margin:0 0 14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.card>h3{font-size:14px;margin:0 0 10px;color:var(--ac)}
+button.b{font:inherit;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;color:#fff;background:#34445f}
+button.b:hover:not(:disabled){filter:brightness(1.15)}button.b:disabled{opacity:.4;cursor:default}
+button.go{background:#2f9a5e}button.stop{background:#bd433a}button.pri{background:var(--acd)}
+button.sm{padding:4px 10px;font-size:13px}
+:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.big{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.big .s{font-size:18px;font-weight:bold;flex:1;min-width:140px}
+.err{color:var(--er);white-space:pre-wrap}.okc{color:var(--ok)}.wac{color:var(--wa)}
+ul{margin:0;padding-left:20px;min-height:24px}
+#log{font:12px Consolas,monospace;height:220px;overflow:auto;background:#080d15;border-radius:6px;padding:8px;white-space:pre-wrap;color:#b8c6dc}
+.row{display:grid;grid-template-columns:190px 1fr 56px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
+h3+.row{border-top:0}
+.row label{cursor:help;text-decoration:underline dotted #567}.row .ctl{display:flex;gap:8px;align-items:center}
+.row .ctl input[type=range]{flex:1;accent-color:var(--ac)}
+input[type=text],input[type=number],select{background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit}
+.ctl>input[type=text],.ctl>select{flex:1}input[type=number]{width:72px}
+.u{font-size:12px;color:var(--mu)}
+fieldset{border:0;padding:0;margin:0;min-width:0}fieldset:disabled{opacity:.45}
+.g .head,.pwrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}.g .head input,.pwrow input{flex:1}.g .head input{font-weight:bold}
+.perms{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}.perms label,.rs{cursor:help}
+.rs{margin-top:8px;display:flex;gap:8px;align-items:center}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;border-top:1px solid var(--line)}th{color:var(--mu);font-weight:normal;border:0}
+.add{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:8px}
+.empty{color:var(--mu);padding:4px 0}
+#bar{display:none;align-items:center;gap:14px;padding:10px 24px;background:#0a101a;border-top:1px solid var(--line)}
+#bar.on{display:flex}#bar .m{flex:1;white-space:pre-wrap;font-size:13px}
+#tip{position:fixed;display:none;max-width:300px;background:#080d15;color:var(--tx);border:1px solid var(--ac);border-radius:6px;padding:7px 10px;font-size:13px;white-space:pre-wrap;z-index:99;pointer-events:none}
+@media (prefers-reduced-motion:no-preference){button.b{transition:filter .15s}}
+</style></head><body>
+<nav>
+ <h1>霧鎖王國開服</h1>
+ <button data-p="console" class="on">控制台</button><button data-p="settings">伺服器設定</button><button data-p="groups">身分組</button><button data-p="bans">黑名單</button>
+ <div class="st"><span class="dot" id="dot"></span><span id="status">未啟動</span></div>
+</nav>
+<main>
+<div class="pages">
+ <section class="page on" id="p-console">
+  <h2>控制台</h2>
+  <div class="card big"><div class="s" id="status2">未啟動</div><button class="b go" id="start">一鍵開服</button><button class="b stop" id="stop" disabled>關閉伺服器</button></div>
+  <div id="err" class="err"></div>
+  <div class="card"><h3>在線成員 (<span id="n">0</span>)</h3><ul id="players"></ul></div>
+  <div class="card"><h3>記錄</h3><div id="log"></div></div>
+ </section>
+ <section class="page" id="p-settings">
+  <h2>伺服器設定</h2>
+  <div class="card"><span class="u" id="dir"></span> <button class="b sm" id="choose">選擇資料夾</button> <button class="b sm" id="reload">重新讀檔</button></div>
+  <div id="runwarn" class="err"></div>
+  <div id="form"></div>
+ </section>
+ <section class="page" id="p-groups"><h2>身分組</h2><div class="u" style="margin-bottom:10px">玩家輸入哪個密碼,就取得該身分組的權限。</div><div id="gcheck" style="margin-bottom:10px"></div><div id="groupsBox"></div><button class="b" id="addg">＋ 新增身分組</button></section>
+ <section class="page" id="p-bans"><h2>黑名單</h2><div id="banBox"></div></section>
+</div>
+<div id="bar"><div class="m" id="msg"></div><button class="b pri" id="save">儲存設定</button></div>
+</main>
+<div id="tip"></div>
+<script>
+const $=id=>document.getElementById(id);
+const L={stopped:'未啟動',starting:'啟動中…',running:'執行中',stopping:'關閉中(存檔中,請稍候)…'};
+let curState='stopped',cfg=null,snap='',dirty=false,groupErrs=[];
+
+function show(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.toggle('on',e.id==='p-'+p));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));
+  $('bar').classList.toggle('on',p!=='console');
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.p));
+
+function el(tag,props){return Object.assign(document.createElement(tag),props||{})}
+function setState(s){
+  curState=s;
+  $('status').textContent=$('status2').textContent=L[s];
+  $('dot').className='dot '+s;
+  $('start').disabled=s!=='stopped';
+  $('stop').disabled=!(s==='running'||s==='starting');
+  if(s==='stopped'&&!dirty)loadCfg(); // 關服時伺服器可能改過設定檔,沒有未存修改就重新讀
+  applyLock();
+}
+function setPlayers(p){
+  $('n').textContent=p.length;
+  $('players').innerHTML='';
+  if(!p.length)return $('players').appendChild(el('li',{className:'u',textContent:'目前沒有人在線'}));
+  p.forEach(n=>$('players').appendChild(el('li',{textContent:n})));
+}
+$('start').onclick=()=>{$('err').textContent='';api.start()};
+$('stop').onclick=()=>api.stop();
+api.on('state',setState);api.on('players',setPlayers);
+api.on('error',m=>$('err').textContent=m);
+api.on('log',l=>{const d=$('log');d.textContent+=l+'\n';if(d.textContent.length>20000)d.textContent=d.textContent.slice(-10000);d.scrollTop=d.scrollHeight});
+
+// hover 說明(自製浮動提示,因為原生 title 在此視窗不顯示)
+(()=>{
+  const tip=$('tip');
+  const place=e=>{const w=tip.offsetWidth,h=tip.offsetHeight;
+    tip.style.left=Math.max(4,Math.min(e.clientX+14,innerWidth-w-8))+'px';
+    tip.style.top=(e.clientY+h+24>innerHeight?e.clientY-h-10:e.clientY+18)+'px'};
+  document.addEventListener('mouseover',e=>{
+    const t=e.target.closest&&e.target.closest('[data-tip]');
+    if(t&&t.dataset.tip){tip.textContent=t.dataset.tip;tip.style.display='block';place(e)}
+  });
+  document.addEventListener('mousemove',e=>{if(tip.style.display==='block')place(e)});
+  document.addEventListener('mouseout',e=>{
+    const t=e.target.closest&&e.target.closest('[data-tip]');
+    if(t&&!(e.relatedTarget&&t.contains(e.relatedTarget)))tip.style.display='none';
+  });
+})();
+
+// ---------- 設定 ----------
+// 數值範圍與說明依據伺服器資料夾內的官方 enshrouded_server_readme.txt
+const NS_MIN=6e10; // 奈秒/分鐘
+// f: 倍率滑桿 [min,max];m: 分鐘滑桿 [min,max];o: 選項 [[值,中文,說明]];b: 開關
+const META={
+ playerHealthFactor:{zh:'玩家生命上限',f:[0.25,4],d:'越高,玩家血越多越耐打。'},
+ playerManaFactor:{zh:'玩家魔力上限',f:[0.25,4],d:'越高,能放的法術越多。'},
+ playerStaminaFactor:{zh:'玩家耐力上限',f:[0.25,4],d:'越高,跑步、閃避、攻擊能撐更久。'},
+ playerBodyHeatFactor:{zh:'抗寒能力',f:[0.5,2],d:'越高,在寒冷地區能待越久才會失溫。'},
+ playerDivingTimeFactor:{zh:'潛水時間',f:[0.5,2],d:'越高,在水裡能憋氣越久。'},
+ enableDurability:{zh:'武器耐久度',b:1,d:'勾選=武器會損壞;取消=武器永遠不會壞。'},
+ enableStarvingDebuff:{zh:'飢餓與挨餓',b:1,d:'勾選=不吃東西會持續扣血直到死亡。'},
+ foodBuffDurationFactor:{zh:'食物增益時間',f:[0.5,2],d:'越高,吃東西的增益效果持續越久。'},
+ fromHungerToStarving:{zh:'飢餓到挨餓的時間',m:[5,20],d:'肚子餓之後多久開始挨餓扣血,越高越寬鬆。要勾選「飢餓與挨餓」才有用。'},
+ shroudTimeFactor:{zh:'迷霧內停留時間',f:[0.5,2],d:'越高,在迷霧裡能待越久。'},
+ tombstoneMode:{zh:'死亡掉落',o:[['AddBackpackMaterials','只掉背包素材(預設)','死亡時素材掉進墓碑,可回去撿。'],['Everything','背包全部掉落','死亡時背包所有東西都掉進墓碑。'],['NoTombstone','不掉落','死亡時什麼都不會掉。']],d:'死亡時會掉什麼東西。'},
+ enableGliderTurbulences:{zh:'滑翔亂流',b:1,d:'取消=滑翔時不受氣流干擾,比較好控制。'},
+ weatherFrequency:{zh:'天氣出現頻率',o:[['Disabled','無天氣',''],['Rare','很少',''],['Normal','普通(預設)',''],['Often','頻繁','']],d:'多久出現一次新的天氣。'},
+ fishingDifficulty:{zh:'釣魚難度',o:[['VeryEasy','非常簡單',''],['Easy','簡單',''],['Normal','普通(預設)',''],['Hard','困難',''],['VeryHard','非常困難','']],d:'難度越高,魚越強,釣魚小遊戲越久。'},
+ miningDamageFactor:{zh:'挖礦效率',f:[0.5,2],d:'越高,每次挖掘破壞越多、拿到越多資源。'},
+ plantGrowthSpeedFactor:{zh:'植物生長速度',f:[0.25,2],d:'越高,作物長得越快。'},
+ resourceDropStackAmountFactor:{zh:'資源獲得量',f:[0.25,2],d:'越高,寶箱和敵人掉落的素材越多。'},
+ factoryProductionSpeedFactor:{zh:'工作站生產時間',f:[0.25,2],d:'注意:越高,製作東西要等越久。'},
+ perkUpgradeRecyclingFactor:{zh:'武器回收返還率',f:[0,1],d:'越高,分解升級過的武器時返還的符文越多。'},
+ perkCostFactor:{zh:'武器升級花費',f:[0.25,2],d:'越高,升級武器要花越多符文。'},
+ experienceCombatFactor:{zh:'戰鬥經驗',f:[0.25,2],d:'越高,打怪升級越快。'},
+ experienceMiningFactor:{zh:'挖礦經驗',f:[0,2],d:'越高,挖礦升級越快;0=挖礦不給經驗。'},
+ experienceExplorationQuestsFactor:{zh:'探索/任務經驗',f:[0.25,2],d:'越高,探索和做任務升級越快。'},
+ randomSpawnerAmount:{zh:'敵人數量',o:[['Few','少',''],['Normal','普通(預設)',''],['Automatic','自動',''],['Many','多',''],['Extreme','極多','']],d:'世界裡的敵人有多少。'},
+ aggroPoolAmount:{zh:'同時攻擊的敵人數',o:[['Few','少',''],['Normal','普通(預設)',''],['Many','多',''],['Extreme','極多','']],d:'同時能有多少敵人圍攻你,越多越難。'},
+ enemyDamageFactor:{zh:'敵人傷害',f:[0.25,5],d:'越高,被敵人打越痛(頭目除外)。'},
+ enemyHealthFactor:{zh:'敵人生命',f:[0.25,4],d:'越高,敵人越耐打(頭目除外)。'},
+ enemyStaminaFactor:{zh:'敵人抗擊暈',f:[0.5,2],d:'越高,越難把敵人打暈(頭目除外)。'},
+ enemyPerceptionRangeFactor:{zh:'敵人感知範圍',f:[0.5,2],d:'越高,敵人從越遠就發現你(頭目除外)。'},
+ bossDamageFactor:{zh:'頭目傷害',f:[0.2,5],d:'越高,頭目打人越痛。'},
+ bossHealthFactor:{zh:'頭目生命',f:[0.2,5],d:'越高,頭目越耐打。'},
+ threatBonus:{zh:'敵人攻擊頻率',f:[0.25,4],d:'越高,敵人越常出手(頭目除外)。'},
+ pacifyAllEnemies:{zh:'敵人保持和平',b:1,d:'勾選=敵人不會主動攻擊你,除非先被攻擊(頭目除外)。'},
+ tamingStartleRepercussion:{zh:'馴服驚嚇後果',o:[['KeepProgress','保留進度','嚇到動物也不會損失進度。'],['LoseSomeProgress','損失部分進度(預設)',''],['LoseAllProgress','損失全部進度','嚇到就要重新馴服。']],d:'馴服時把動物嚇到,進度會怎樣。'},
+ dayTimeDuration:{zh:'白天長度',m:[2,60],d:'越高,白天越長。'},
+ nightTimeDuration:{zh:'夜晚長度',m:[2,60],d:'越高,夜晚越長。'},
+ curseModifier:{zh:'迷霧詛咒',o:[['Easy','關閉','被特定敵人打到不會中詛咒。'],['Normal','普通(預設)',''],['Hard','機率加倍','中詛咒的機率是普通的兩倍。']],d:'被特定敵人攻擊時中詛咒的機率。'},
+ flameLevelFogRemoval:{zh:'迷霧建祭壇所需火焰等級',n:[0,20],d:'越高,要更高的火焰等級才能在迷霧裡建火焰祭壇。'}
+};
+const PRESETS=[['Default','預設','和遊戲原本設定相同。'],['Relaxed','輕鬆','敵人少、資源多,適合蓋房子。'],['Hard','困難','敵人更多更兇。'],['Survival','生存','敵人更兇,另有飢餓等生存機制。'],['Custom','自訂','自己調整下面的數值(只有選這個,下面的數值才會生效)。']];
+const CATS=[
+ ['玩家',['playerHealthFactor','playerManaFactor','playerStaminaFactor','tombstoneMode','enableDurability','enableGliderTurbulences']],
+ ['生存與環境',['playerBodyHeatFactor','playerDivingTimeFactor','enableStarvingDebuff','foodBuffDurationFactor','fromHungerToStarving','shroudTimeFactor','weatherFrequency','curseModifier']],
+ ['敵人與頭目',['randomSpawnerAmount','aggroPoolAmount','enemyDamageFactor','enemyHealthFactor','enemyStaminaFactor','enemyPerceptionRangeFactor','bossDamageFactor','bossHealthFactor','threatBonus','pacifyAllEnemies','tamingStartleRepercussion']],
+ ['經驗與資源',['miningDamageFactor','resourceDropStackAmountFactor','perkUpgradeRecyclingFactor','perkCostFactor','experienceCombatFactor','experienceMiningFactor','experienceExplorationQuestsFactor']],
+ ['世界',['dayTimeDuration','nightTimeDuration','fishingDifficulty','plantGrowthSpeedFactor','factoryProductionSpeedFactor','flameLevelFogRemoval']]
+];
+
+function item(label,controls,unit,desc){
+  const r=el('div',{className:'row'});
+  const lab=el('label',{textContent:label});lab.dataset.tip=desc||'';
+  const c=el('div',{className:'ctl'});controls.forEach(x=>c.appendChild(x));
+  r.append(lab,c,el('span',{className:'u',textContent:unit||''}));
+  return r;
+}
+function slider(min,max,step,value,onChange){
+  max=Math.max(max,value);min=Math.min(min,value);
+  const s=el('input',{type:'range',min,max,step,value});
+  const n=el('input',{type:'number',min,step,value});
+  s.oninput=()=>{n.value=s.value;onChange(+s.value)};
+  n.oninput=()=>{if(n.value==='')return;s.max=Math.max(+s.max,+n.value);s.value=n.value;onChange(+n.value)};
+  return [s,n];
+}
+function selectItem(label,opts,value,desc,onChange){
+  if(!opts.some(o=>o[0]===value))opts=opts.concat([[value,value,'']]);
+  const s=el('select');
+  opts.forEach(o=>s.appendChild(el('option',{value:o[0],textContent:o[1],selected:o[0]===value})));
+  const w=item(label,[s],'',desc);
+  const lab=w.querySelector('label');
+  const upd=()=>{const o=opts.find(x=>x[0]===s.value);lab.dataset.tip=(desc||'')+(o&&o[2]?'\n'+o[1]+':'+o[2]:'')};
+  s.onchange=()=>{onChange(s.value);upd()};upd();
+  return w;
+}
+function checkbox(value,onChange){const i=el('input',{type:'checkbox',checked:value});i.onchange=()=>onChange(i.checked);return i}
+function card(title){const c=el('div',{className:'card'});c.appendChild(el('h3',{textContent:title}));return c}
+
+let gsBox;
+function buildForm(){
+  const f=$('form');f.innerHTML='';
+  const c=cfg;
+  let b=card('基本');
+  const nm=el('input',{type:'text',value:c.name});nm.oninput=()=>c.name=nm.value;
+  b.appendChild(item('伺服器名稱',[nm],'','玩家在遊戲的「加入遊戲」清單中搜尋用的名稱。'));
+  b.appendChild(item('最大人數',slider(1,16,1,c.slotCount,v=>c.slotCount=v),'人','同時在線人數上限(1~16)。'));
+  if('voiceChatMode' in c)b.appendChild(selectItem('語音聊天範圍',[['Proximity','附近(靠近才聽得到)',''],['Global','全服(所有人都聽得到)','']],c.voiceChatMode,'需先開啟語音聊天。',v=>c.voiceChatMode=v));
+  if('enableVoiceChat' in c)b.appendChild(item('語音聊天',[checkbox(c.enableVoiceChat,v=>c.enableVoiceChat=v)],'','開啟=玩家可用遊戲內語音。'));
+  if('enableTextChat' in c)b.appendChild(item('文字聊天',[checkbox(c.enableTextChat,v=>c.enableTextChat=v)],'','開啟=玩家可用遊戲內文字聊天。'));
+  f.appendChild(b);
+
+  b=card('難度');
+  b.appendChild(selectItem('難度預設',PRESETS,c.gameSettingsPreset,'只有選「自訂」,下面各項才會生效。',v=>{c.gameSettingsPreset=v;lockGS()}));
+  f.appendChild(b);
+
+  gsBox=el('fieldset');
+  const gs=c.gameSettings,used=new Set(CATS.flatMap(x=>x[1]));
+  const build=k=>{
+    const v=gs[k],m=META[k]||{zh:k};
+    if(typeof v==='boolean')return item(m.zh,[checkbox(v,x=>gs[k]=x)],'',m.d);
+    if(m.o)return selectItem(m.zh,m.o,v,m.d,x=>gs[k]=x);
+    if(typeof v==='number'&&m.m)return item(m.zh,slider(m.m[0],m.m[1],1,v/NS_MIN,x=>gs[k]=Math.round(x*NS_MIN)),'分鐘',m.d);
+    if(typeof v==='number'&&m.f)return item(m.zh,slider(m.f[0],m.f[1],0.05,v,x=>gs[k]=Math.round(x*100)/100),'倍',m.d);
+    if(typeof v==='number'){const [a,z]=m.n||[0,100];return item(m.zh,slider(a,z,1,v,x=>gs[k]=x),'',m.d)}
+    const i=el('input',{type:'text',value:v});i.oninput=()=>gs[k]=i.value;
+    return item(m.zh,[i],'',m.d);
+  };
+  CATS.forEach(([title,keys])=>{
+    const cd=card(title);
+    keys.filter(k=>k in gs).forEach(k=>cd.appendChild(build(k)));
+    if(title==='世界')Object.keys(gs).filter(k=>!used.has(k)).forEach(k=>cd.appendChild(build(k)));
+    gsBox.appendChild(cd);
+  });
+  f.appendChild(gsBox);lockGS();
+}
+const PERMS=[['canKickBan','踢人 / 封鎖玩家','可以踢出或永久封鎖其他玩家,建議只給管理員。'],['canAccessInventories','開箱子與容器','可以開基地裡的箱子、工作站等容器(野外寶箱不受影響)。'],['canEditWorld','改野外地形','可以挖掘、破壞野外地形。不想被亂挖就不要勾。'],['canEditBase','基地建造與拆除','可以在基地內建造、拆除、改地形與放水。'],['canExtendBase','火焰祭壇管理','可以新增、拆除、升級火焰祭壇(擴大基地)。']];
+function randPw(){const a='abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';crypto.getRandomValues(new Uint32Array(12)).forEach(x=>s+=a[x%a.length]);return s}
+function renderGroups(){
+  const box=$('groupsBox');box.innerHTML='';
+  cfg.userGroups.forEach((g,idx)=>{
+    const c=el('div',{className:'card g'});
+    const head=el('div',{className:'head'});
+    const nm=el('input',{type:'text',value:g.name,placeholder:'身分組名稱'});nm.oninput=()=>{g.name=nm.value;checkGroups()};
+    const del=el('button',{className:'b sm stop',textContent:'刪除'});
+    del.onclick=()=>{cfg.userGroups.splice(idx,1);renderGroups();touch()};
+    head.append(nm,del);c.appendChild(head);
+
+    const pr=el('div',{className:'pwrow'});
+    const pl=el('label',{textContent:'密碼'});pl.dataset.tip='玩家加入時輸入這個密碼,就會取得此身分組的權限。留空=不用密碼(全部身分組中最多一個)。';
+    const pw=el('input',{type:'text',value:g.password||'',placeholder:'留空=不需要密碼'});pw.oninput=()=>{g.password=pw.value;checkGroups()};
+    const dice=el('button',{className:'b sm',textContent:'隨機'});dice.onclick=()=>{pw.value=randPw();g.password=pw.value;checkGroups();touch()};
+    pr.append(pl,pw,dice);c.appendChild(pr);
+
+    const pm=el('div',{className:'perms'});
+    PERMS.forEach(([k,zh,tip])=>{
+      const lab=el('label');lab.dataset.tip=tip;
+      const cb=el('input',{type:'checkbox',checked:!!g[k]});cb.onchange=()=>{g[k]=cb.checked;checkGroups()};
+      lab.append(cb,document.createTextNode(' '+zh));pm.appendChild(lab);
+    });
+    c.appendChild(pm);
+
+    const rs=el('label',{className:'rs'});rs.dataset.tip='替這個身分組預留的名額。人數滿時,其他身分組會被擋在外面,這個身分組仍進得來。';
+    rs.appendChild(document.createTextNode('保留名額'));
+    const ri=el('input',{type:'number',min:0,max:16,value:g.reservedSlots||0});ri.oninput=()=>{g.reservedSlots=Math.max(0,+ri.value||0)};
+    rs.appendChild(ri);c.appendChild(rs);
+    box.appendChild(c);
+  });
+  checkGroups();
+}
+$('addg').onclick=()=>{
+  if(!cfg)return;
+  let n=1;while(cfg.userGroups.some(g=>g.name==='新身分組'+n))n++;
+  cfg.userGroups.push({name:'新身分組'+n,password:randPw(),canKickBan:false,canAccessInventories:false,canEditWorld:false,canEditBase:false,canExtendBase:false,reservedSlots:0});
+  renderGroups();touch();
+};
+function checkGroups(){
+  const g=cfg.userGroups,errs=[],warns=[];
+  if(!g.length)errs.push('至少要有一個身分組');
+  const names=g.map(x=>(x.name||'').trim());
+  if(names.some(n=>!n))errs.push('身分組名稱不能空白');
+  if(new Set(names).size!==names.length)errs.push('身分組名稱不能重複');
+  const pws=g.map(x=>x.password||'').filter(Boolean);
+  if(new Set(pws).size!==pws.length)errs.push('密碼不能重複(每個身分組要不同密碼)');
+  if(g.length-pws.length>1)errs.push('最多只能有一個身分組不設密碼');
+  const open=g.find(x=>!x.password);
+  if(open)g.filter(x=>x.password).forEach(p=>{
+    if(PERMS.some(([k])=>open[k]&&!p[k]))warns.push('「'+open.name+'」沒有密碼,卻有比「'+p.name+'」更多的權限,伺服器可能拒絕啟動');
+  });
+  const gc=$('gcheck');gc.innerHTML='';
+  errs.forEach(x=>gc.appendChild(el('div',{className:'err',textContent:'✖ '+x})));
+  warns.forEach(x=>gc.appendChild(el('div',{className:'wac',textContent:'⚠ '+x})));
+  if(!errs.length&&!warns.length)gc.appendChild(el('div',{className:'okc',textContent:'✔ 身分組設定沒問題'}));
+  groupErrs=errs;applyLock();
+}
+
+// ---------- 黑名單 ----------
+function renderBans(){
+  const box=$('banBox');box.innerHTML='';
+  const list=cfg.bannedAccounts||[];
+  const c=card('已封鎖 ('+list.length+')');
+  if(!list.length)c.appendChild(el('div',{className:'empty',textContent:'目前沒有封鎖任何人。有「踢人 / 封鎖」權限的玩家封鎖人後,會出現在這裡。'}));
+  else{
+    const t=el('table');t.innerHTML='<tr><th>名稱</th><th>角色名</th><th>封鎖日期</th><th>帳號雜湊</th><th></th></tr>';
+    list.forEach((b,i)=>{
+      const tr=el('tr');
+      const h=String(b.accountIDHash||'');
+      [b.displayName||'—',b.characterName||'—',b.banDate?new Date(b.banDate*1000).toLocaleDateString('zh-TW'):'—',h.length>14?h.slice(0,8)+'…'+h.slice(-4):h].forEach((x,j)=>{
+        const td=el('td',{textContent:x});if(j===3){td.dataset.tip=h;td.style.fontFamily='Consolas,monospace'}tr.appendChild(td)});
+      const td=el('td');const u=el('button',{className:'b sm',textContent:'解除封鎖'});
+      u.onclick=()=>{list.splice(i,1);renderBans();touch()};td.appendChild(u);tr.appendChild(td);t.appendChild(tr);
+    });
+    c.appendChild(t);
+  }
+  box.appendChild(c);
+  const a=card('手動新增');
+  const f=el('div',{className:'add'});
+  const hs=el('input',{type:'text',placeholder:'帳號雜湊(必填)'}),dn=el('input',{type:'text',placeholder:'顯示名稱'}),cn=el('input',{type:'text',placeholder:'角色名'});
+  const ad=el('button',{className:'b pri',textContent:'新增封鎖'});
+  const warn=el('div',{className:'err'});
+  ad.onclick=()=>{
+    const h=hs.value.trim();
+    if(!h){warn.textContent='帳號雜湊不能空白';return}
+    if(list.some(x=>x.accountIDHash===h)){warn.textContent='這個雜湊已在黑名單中';return}
+    if(!cfg.bannedAccounts)cfg.bannedAccounts=list;
+    list.push({accountIDHash:h,displayName:dn.value.trim(),characterName:cn.value.trim(),banDate:Math.floor(Date.now()/1000)});
+    renderBans();touch();
+  };
+  f.append(hs,dn,cn,ad);a.append(f,warn,el('div',{className:'u',textContent:'手動新增的項目伺服器是否接受尚未驗證,存檔後請開服確認。'}));
+  box.appendChild(a);
+}
+
+// ---------- 讀檔 / 存檔 ----------
+function lockGS(){if(gsBox)gsBox.disabled=cfg.gameSettingsPreset!=='Custom'}
+function touch(){dirty=!!cfg&&JSON.stringify(cfg)!==snap;applyLock()}
+document.addEventListener('input',()=>setTimeout(touch));
+document.addEventListener('change',()=>setTimeout(touch));
+let note=false; // msg 目前是否顯示儲存/錯誤結果
+function applyLock(){
+  const running=curState!=='stopped';
+  $('save').disabled=running||!cfg||!dirty||groupErrs.length>0;
+  $('choose').disabled=running;
+  $('runwarn').textContent=running?'伺服器執行中,設定無法儲存。請先關閉伺服器。':'';
+  if(!note){$('msg').className='m';$('msg').textContent=dirty?'有尚未儲存的修改':''}
+}
+function say(text,cls){note=!!text;$('msg').className='m '+(cls||'');$('msg').textContent=text}
+async function loadCfg(){
+  const r=await api.getConfig();
+  $('dir').textContent='伺服器資料夾:'+r.dir;
+  if(!r.ok){cfg=null;snap='';dirty=false;$('form').innerHTML='';say(r.error,'err');applyLock();return}
+  cfg=r.config;snap=JSON.stringify(cfg);dirty=false;say('');
+  buildForm();renderGroups();renderBans();applyLock();
+}
+$('reload').onclick=()=>{
+  if(dirty&&!confirm('有尚未儲存的修改,重新讀檔會全部丟掉。繼續嗎?'))return;
+  loadCfg();
+};
+$('choose').onclick=async()=>{
+  if(dirty&&!confirm('有尚未儲存的修改,更換資料夾會全部丟掉。繼續嗎?'))return;
+  const r=await api.chooseDir();
+  if(r.error)say(r.error,'err');
+  if(r.ok)loadCfg();
+};
+document.addEventListener('input',()=>{if(note&&dirty)say('')},true);
+$('save').onclick=async()=>{
+  let r=await api.saveConfig({config:cfg});
+  if(r.conflict){
+    if(!confirm('設定檔在你載入之後被其他程式修改過。要用目前畫面的內容覆蓋嗎?(舊檔會先備份)'))return;
+    r=await api.saveConfig({config:cfg,force:true});
+  }
+  if(!r.ok){say(r.errors.join('\n'),'err');return}
+  snap=JSON.stringify(cfg);dirty=false;
+  const w=r.warnings&&r.warnings.length;
+  say('已儲存,舊設定備份在伺服器資料夾的 config-backups'+(w?'\n警告:'+r.warnings.join('\n警告:'):''),w?'wac':'okc');
+  applyLock();
+};
+
+api.getState().then(s=>{setState(s.state);setPlayers(s.players)});
+loadCfg();
+</script></body></html>

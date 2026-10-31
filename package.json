@@ -1,0 +1,42 @@
+{
+  "name": "enshrouded-gui",
+  "version": "0.1.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "22.3.27",
+    "electron-builder": "23.6.0"
+  },
+  "description": "霧鎖王國開服工具",
+  "author": "local",
+  "build": {
+    "appId": "local.enshrouded.gui",
+    "productName": "EnshroudedServerTool",
+    "asarUnpack": [
+      "ctrlc.ps1"
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "ctrlc.ps1",
+      "package.json",
+      "build/icon.png"
+    ],
+    "win": {
+      "target": "portable",
+      "requestedExecutionLevel": "asInvoker",
+      "icon": "build/icon.ico"
+    },
+    "portable": {
+      "artifactName": "EnshroudedServerTool.exe"
+    },
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    }
+  }
+}
