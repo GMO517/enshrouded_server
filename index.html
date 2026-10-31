@@ -65,12 +65,12 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
   <div id="runwarn" class="err"></div>
   <div id="form"></div>
  </section>
- <section class="page" id="p-groups"><h2>身分組</h2><div class="u" style="margin-bottom:10px">玩家輸入哪個密碼,就取得該身分組的權限。</div><div id="gcheck" style="margin-bottom:10px"></div><div id="groupsBox"></div><button class="b" id="addg">＋ 新增身分組</button></section>
+ <section class="page" id="p-groups"><h2>身分組</h2><div class="u" style="margin-bottom:10px">玩家輸入哪個密碼,就取得該身分組的權限。若全部都不想設密碼,需刪到只剩一個身分組(最多只能有一個不設密碼)。</div><div id="gcheck" style="margin-bottom:10px"></div><div id="groupsBox"></div><button class="b" id="addg">＋ 新增身分組</button></section>
  <section class="page" id="p-bans"><h2>黑名單</h2><div id="banBox"></div></section>
  <section class="page" id="p-backup"><h2>地圖備份</h2><div class="card"><button class="b pri" id="bk">備份目前地圖</button> <span class="u" id="bkmsg"></span><div class="u" style="margin-top:6px">備份放在伺服器資料夾的 world-backups。備份與還原都要先關閉伺服器;還原前會自動再備份一份目前的地圖。</div></div><div id="bkList"></div></section>
  <section class="page" id="p-install"><h2>伺服器安裝</h2>
-  <div class="card"><h3>路徑</h3><div class="row"><label>SteamCMD 資料夾</label><div class="ctl"><span class="u" id="scDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="chooseSc">選擇</button></div>
-  <div class="row"><label>遊戲伺服器資料夾</label><div class="ctl"><span class="u" id="svDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="choose">選擇</button></div>
+  <div class="card"><h3>路徑</h3><div class="row"><label data-tip="請自行從 Valve 下載 SteamCMD 並解壓縮,這裡選到有 steamcmd.exe 的資料夾。">SteamCMD 資料夾</label><div class="ctl"><span class="u" id="scDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="chooseSc">選擇</button></div>
+  <div class="row"><label data-tip="遊戲伺服器要安裝(或已安裝)的資料夾,存檔與設定檔都在這裡。更新前請先關閉伺服器。">遊戲伺服器資料夾</label><div class="ctl"><span class="u" id="svDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="choose">選擇</button></div>
   </div>
   <div class="card"><h3>安裝與更新</h3><button class="b pri" id="inst">安裝伺服器</button> <button class="b pri" id="upd">更新伺服器</button> <span class="u" id="instmsg"></span></div></section>
 </div>
