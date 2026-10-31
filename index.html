@@ -71,8 +71,8 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
  <section class="page" id="p-install"><h2>伺服器安裝</h2>
   <div class="card"><h3>路徑</h3><div class="row"><label>SteamCMD 資料夾</label><div class="ctl"><span class="u" id="scDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="chooseSc">選擇</button></div>
   <div class="row"><label>遊戲伺服器資料夾</label><div class="ctl"><span class="u" id="svDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="choose">選擇</button></div>
-  <div class="u" style="margin-top:8px">SteamCMD 請自行從 Valve 下載並解壓縮,這裡只需選到有 steamcmd.exe 的資料夾。</div></div>
-  <div class="card"><h3>安裝與更新</h3><button class="b pri" id="inst">安裝伺服器</button> <button class="b pri" id="upd">更新伺服器</button> <span class="u" id="instmsg"></span><div class="u" style="margin-top:6px">用匿名登入下載(App ID 2278520),不會動存檔與設定檔。進度會顯示在「控制台」的記錄。更新前請先關閉伺服器。</div></div></section>
+  </div>
+  <div class="card"><h3>安裝與更新</h3><button class="b pri" id="inst">安裝伺服器</button> <button class="b pri" id="upd">更新伺服器</button> <span class="u" id="instmsg"></span></div></section>
 </div>
 <div id="bar"><div class="m" id="msg"></div><button class="b pri" id="save">儲存設定</button></div>
 </main>
@@ -373,6 +373,7 @@ $('choose').onclick=async()=>{
   const r=await api.chooseDir();
   if(r.error)say(r.error,'err');
   if(r.ok)loadCfg();
+  refreshPaths();
 };
 document.addEventListener('input',()=>{if(note&&dirty)say('')},true);
 $('save').onclick=async()=>{
