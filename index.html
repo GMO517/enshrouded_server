@@ -47,7 +47,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
 </style></head><body>
 <nav>
  <h1>霧鎖王國開服</h1>
- <button data-p="console" class="on">控制台</button><button data-p="settings">伺服器設定</button><button data-p="groups">身分組</button><button data-p="bans">黑名單</button>
+ <button data-p="console" class="on">控制台</button><button data-p="settings">伺服器設定</button><button data-p="groups">身分組</button><button data-p="bans">黑名單</button><button data-p="backup">地圖備份</button><button data-p="install">伺服器安裝</button>
  <div class="st"><span class="dot" id="dot"></span><span id="status">未啟動</span></div>
 </nav>
 <main>
@@ -61,12 +61,18 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
  </section>
  <section class="page" id="p-settings">
   <h2>伺服器設定</h2>
-  <div class="card"><span class="u" id="dir"></span> <button class="b sm" id="choose">選擇資料夾</button> <button class="b sm" id="reload">重新讀檔</button></div>
+  <div class="card"><span class="u" id="dir"></span> <button class="b sm" id="reload">重新讀檔</button></div>
   <div id="runwarn" class="err"></div>
   <div id="form"></div>
  </section>
  <section class="page" id="p-groups"><h2>身分組</h2><div class="u" style="margin-bottom:10px">玩家輸入哪個密碼,就取得該身分組的權限。</div><div id="gcheck" style="margin-bottom:10px"></div><div id="groupsBox"></div><button class="b" id="addg">＋ 新增身分組</button></section>
  <section class="page" id="p-bans"><h2>黑名單</h2><div id="banBox"></div></section>
+ <section class="page" id="p-backup"><h2>地圖備份</h2><div class="card"><button class="b pri" id="bk">備份目前地圖</button> <span class="u" id="bkmsg"></span><div class="u" style="margin-top:6px">備份放在伺服器資料夾的 world-backups。備份與還原都要先關閉伺服器;還原前會自動再備份一份目前的地圖。</div></div><div id="bkList"></div></section>
+ <section class="page" id="p-install"><h2>伺服器安裝</h2>
+  <div class="card"><h3>路徑</h3><div class="row"><label>SteamCMD 資料夾</label><div class="ctl"><span class="u" id="scDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="chooseSc">選擇</button></div>
+  <div class="row"><label>遊戲伺服器資料夾</label><div class="ctl"><span class="u" id="svDir" style="flex:1;word-break:break-all"></span></div><button class="b sm" id="choose">選擇</button></div>
+  <div class="u" style="margin-top:8px">SteamCMD 請自行從 Valve 下載並解壓縮,這裡只需選到有 steamcmd.exe 的資料夾。</div></div>
+  <div class="card"><h3>安裝與更新</h3><button class="b pri" id="inst">安裝伺服器</button> <button class="b pri" id="upd">更新伺服器</button> <span class="u" id="instmsg"></span><div class="u" style="margin-top:6px">用匿名登入下載(App ID 2278520),不會動存檔與設定檔。進度會顯示在「控制台」的記錄。更新前請先關閉伺服器。</div></div></section>
 </div>
 <div id="bar"><div class="m" id="msg"></div><button class="b pri" id="save">儲存設定</button></div>
 </main>
@@ -74,12 +80,13 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
 <script>
 const $=id=>document.getElementById(id);
 const L={stopped:'未啟動',starting:'啟動中…',running:'執行中',stopping:'關閉中(存檔中,請稍候)…'};
-let curState='stopped',cfg=null,snap='',dirty=false,groupErrs=[];
+let installing=false,curState='stopped',cfg=null,snap='',dirty=false,groupErrs=[];
 
 function show(p){
   document.querySelectorAll('.page').forEach(e=>e.classList.toggle('on',e.id==='p-'+p));
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.p===p));
-  $('bar').classList.toggle('on',p!=='console');
+  $('bar').classList.toggle('on',p==='settings'||p==='groups'||p==='bans');
+  if(p==='backup')renderBackups();if(p==='install')refreshPaths();
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.p));
 
@@ -88,10 +95,10 @@ function setState(s){
   curState=s;
   $('status').textContent=$('status2').textContent=L[s];
   $('dot').className='dot '+s;
-  $('start').disabled=s!=='stopped';
+  $('start').disabled=s!=='stopped'||installing;
   $('stop').disabled=!(s==='running'||s==='starting');
   if(s==='stopped'&&!dirty)loadCfg(); // 關服時伺服器可能改過設定檔,沒有未存修改就重新讀
-  applyLock();
+  applyLock();refreshPaths();
 }
 function setPlayers(p){
   $('n').textContent=p.length;
@@ -381,6 +388,57 @@ $('save').onclick=async()=>{
   applyLock();
 };
 
+
+// ---------- 安裝 / 更新 ----------
+let installed=false;
+async function refreshPaths(){
+  const p=await api.getPaths();
+  installed=p.installed;installing=p.installing;
+  $('scDir').textContent=p.steamcmd||'(尚未選擇)';$('svDir').textContent=p.server;
+  const idle=curState==='stopped'&&!installing;
+  $('inst').disabled=!idle||installed||!p.steamcmd;$('upd').disabled=!idle||!installed||!p.steamcmd;
+  $('chooseSc').disabled=$('choose').disabled=!idle;
+  $('start').disabled=!idle;
+  $('instmsg').textContent=installing?'安裝/更新中,請稍候…':installed?'已安裝':'尚未安裝';
+}
+$('chooseSc').onclick=async()=>{const r=await api.chooseSteamcmd();if(r.error)$('instmsg').textContent=r.error;refreshPaths()};
+const runInstall=async()=>{
+  $('err').textContent='';
+  const r=await api.installServer();
+  if(!r.ok){$('instmsg').textContent=r.error;return}
+  refreshPaths();show('console');
+};
+$('inst').onclick=$('upd').onclick=runInstall;
+api.on('installing',on=>{installing=on;refreshPaths();if(!on&&!dirty)loadCfg()});
+
+// ---------- 地圖備份 ----------
+const fmtSize=b=>b>=1e9?(b/1e9).toFixed(2)+' GB':(b/1e6).toFixed(1)+' MB';
+async function renderBackups(){
+  const r=await api.backupList(),box=$('bkList');box.innerHTML='';
+  const c=card('已儲存的備份 ('+r.items.length+')');
+  if(!r.items.length)c.appendChild(el('div',{className:'empty',textContent:'還沒有備份。按上面的「備份目前地圖」建立第一份。'}));
+  else{
+    const t=el('table');t.innerHTML='<tr><th>名稱</th><th>時間</th><th>大小</th><th></th></tr>';
+    r.items.forEach(i=>{
+      const tr=el('tr');
+      [i.name,new Date(i.time).toLocaleString('zh-TW',{hour12:false}),fmtSize(i.size)].forEach(x=>tr.appendChild(el('td',{textContent:x})));
+      const td=el('td');
+      const rs=el('button',{className:'b sm',textContent:'還原'}),dl=el('button',{className:'b sm stop',textContent:'刪除'});
+      rs.onclick=()=>act(()=>confirm('要用「'+i.name+'」覆蓋目前的地圖嗎?\n(會先自動備份一份目前的地圖)')&&api.backupRestore(i.name),'已還原');
+      dl.onclick=()=>act(()=>confirm('要刪除備份「'+i.name+'」嗎?刪除後無法復原。')&&api.backupDelete(i.name),'已刪除');
+      td.append(rs,' ',dl);tr.appendChild(td);t.appendChild(tr);
+    });
+    c.appendChild(t);
+  }
+  box.appendChild(c);
+}
+async function act(fn,okText){
+  const r=await fn();if(!r)return;
+  $('bkmsg').className='u '+(r.ok?'okc':'err');$('bkmsg').textContent=r.ok?okText:r.error;
+  renderBackups();
+}
+$('bk').onclick=()=>act(()=>api.backupCreate(),'已備份');
+
 api.getState().then(s=>{setState(s.state);setPlayers(s.players)});
-loadCfg();
+loadCfg();refreshPaths();renderBackups();
 </script></body></html>

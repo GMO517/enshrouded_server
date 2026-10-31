@@ -4,15 +4,20 @@ const path = require('path');
 const fs = require('fs');
 
 const DIR_FILE = () => path.join(app.getPath('userData'), 'server-dir.txt');
+const PATHS_FILE = () => path.join(app.getPath('userData'), 'paths.json');
+function loadPaths() { try { return JSON.parse(fs.readFileSync(PATHS_FILE(), 'utf8')); } catch { return {}; } }
+function savePaths() { fs.writeFileSync(PATHS_FILE(), JSON.stringify({ server: SERVER_DIR, steamcmd: STEAMCMD_DIR })); }
 function loadDir() {
   if (process.env.ENSHROUDED_DIR) return process.env.ENSHROUDED_DIR;
+  if (loadPaths().server) return loadPaths().server;
   try { return fs.readFileSync(DIR_FILE(), 'utf8').trim(); } catch { return 'F:/enshrouded_server'; }
 }
-let SERVER_DIR = 'F:/enshrouded_server';
+let SERVER_DIR = 'F:/enshrouded_server', STEAMCMD_DIR = '';
+const APP_ID = '2278520'; // Enshrouded Dedicated Server
 const EXE = () => path.join(SERVER_DIR, 'enshrouded_server.exe');
 const CFG = () => path.join(SERVER_DIR, 'enshrouded_server.json');
 
-let win, proc = null, state = 'stopped';
+let win, proc = null, state = 'stopped', installing = null;
 let players = new Map(); // index -> name
 let pendingIdx = null;
 
@@ -34,7 +39,7 @@ function handleLine(line) {
 }
 
 function start() {
-  if (proc) return;
+  if (proc || installing) return;
   if (!fs.existsSync(EXE())) return send('error', '找不到 ' + EXE() + '(請到「伺服器設定」選擇資料夾)');
   players.clear(); pushPlayers(); setState('starting');
   proc = spawn(EXE(), [], { cwd: SERVER_DIR, windowsHide: true });
@@ -136,23 +141,85 @@ ipcMain.handle('save-config', (_e, { config: c, force }) => {
     return { ok: false, errors: ['儲存失敗,原設定檔未變動:' + e.message] };
   }
 });
+ipcMain.handle('get-paths', () => ({ server: SERVER_DIR, steamcmd: STEAMCMD_DIR, installed: fs.existsSync(EXE()), installing: !!installing }));
+async function pick(title) {
+  const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'], title });
+  return r.canceled ? null : r.filePaths[0];
+}
 ipcMain.handle('choose-dir', async () => {
-  if (proc) return { ok: false };
-  const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: '選擇 enshrouded_server 資料夾' });
-  if (r.canceled) return { ok: false };
-  if (!fs.existsSync(path.join(r.filePaths[0], 'enshrouded_server.exe'))) return { ok: false, error: '該資料夾內沒有 enshrouded_server.exe' };
-  SERVER_DIR = r.filePaths[0];
-  fs.writeFileSync(DIR_FILE(), SERVER_DIR);
-  return { ok: true, dir: SERVER_DIR };
+  if (proc || installing) return { ok: false };
+  const d = await pick('選擇遊戲伺服器要放的資料夾');
+  if (!d) return { ok: false };
+  SERVER_DIR = d; savePaths();
+  return { ok: true };
+});
+ipcMain.handle('choose-steamcmd', async () => {
+  if (installing) return { ok: false };
+  const d = await pick('選擇 SteamCMD 所在的資料夾');
+  if (!d) return { ok: false };
+  if (!fs.existsSync(path.join(d, 'steamcmd.exe'))) return { ok: false, error: '該資料夾內沒有 steamcmd.exe' };
+  STEAMCMD_DIR = d; savePaths();
+  return { ok: true };
+});
+// 安裝與更新用同一條指令:app_update 會補齊缺的檔案、更新到最新版,不動存檔與設定檔
+ipcMain.handle('install-server', () => {
+  if (proc || installing) return { ok: false, error: '伺服器執行中或正在安裝' };
+  const exe = path.join(STEAMCMD_DIR, 'steamcmd.exe');
+  if (!STEAMCMD_DIR || !fs.existsSync(exe)) return { ok: false, error: '請先選擇 SteamCMD 資料夾' };
+  fs.mkdirSync(SERVER_DIR, { recursive: true });
+  installing = spawn(exe, ['+force_install_dir', SERVER_DIR, '+login', 'anonymous', '+app_update', APP_ID, 'validate', '+quit'], { cwd: STEAMCMD_DIR, windowsHide: true });
+  send('installing', true);
+  const onData = d => d.toString('utf8').split(/[\r\n]+/).filter(l => l.trim()).forEach(l => send('log', l));
+  installing.stdout.on('data', onData); installing.stderr.on('data', onData);
+  installing.on('error', e => { send('log', '無法執行 SteamCMD:' + e.message); });
+  installing.on('exit', code => { installing = null; send('log', 'SteamCMD 結束,代碼 ' + code + (code === 0 ? '(完成)' : '(失敗;第一次執行常會先自我更新,可再按一次)')); send('installing', false); });
+  return { ok: true };
+});
+
+// ---------- 地圖備份 ----------
+const SAVE = () => path.join(SERVER_DIR, 'savegame');
+const BAK = () => path.join(SERVER_DIR, 'world-backups');
+const bakPath = n => path.join(BAK(), path.basename(n)); // basename 防止路徑跳脫
+const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); };
+function dirSize(d) { return fs.readdirSync(d, { withFileTypes: true }).reduce((n, e) => n + (e.isDirectory() ? dirSize(path.join(d, e.name)) : fs.statSync(path.join(d, e.name)).size), 0); }
+const busy = () => proc || installing ? { ok: false, error: '伺服器執行中或正在安裝,請先關閉' } : null;
+ipcMain.handle('backup-list', () => {
+  try {
+    return { ok: true, items: fs.readdirSync(BAK(), { withFileTypes: true }).filter(e => e.isDirectory())
+      .map(e => { const p = path.join(BAK(), e.name); return { name: e.name, time: fs.statSync(p).mtimeMs, size: dirSize(p) }; })
+      .sort((a, b) => b.time - a.time) };
+  } catch { return { ok: true, items: [] }; }
+});
+ipcMain.handle('backup-create', () => {
+  if (busy()) return busy();
+  if (!fs.existsSync(SAVE())) return { ok: false, error: '找不到存檔資料夾:' + SAVE() };
+  try { fs.cpSync(SAVE(), path.join(BAK(), stamp()), { recursive: true }); return { ok: true }; }
+  catch (e) { return { ok: false, error: '備份失敗:' + e.message }; }
+});
+ipcMain.handle('backup-restore', (_e, name) => {
+  if (busy()) return busy();
+  const src = bakPath(name);
+  if (!fs.existsSync(src)) return { ok: false, error: '找不到這份備份' };
+  try {
+    if (fs.existsSync(SAVE())) fs.cpSync(SAVE(), path.join(BAK(), stamp() + '-還原前自動備份'), { recursive: true }); // 還原會蓋掉現有存檔,先留一份
+    fs.rmSync(SAVE(), { recursive: true, force: true });
+    fs.cpSync(src, SAVE(), { recursive: true });
+    return { ok: true };
+  } catch (e) { return { ok: false, error: '還原失敗:' + e.message }; }
+});
+ipcMain.handle('backup-delete', (_e, name) => {
+  try { fs.rmSync(bakPath(name), { recursive: true }); return { ok: true }; }
+  catch (e) { return { ok: false, error: '刪除失敗:' + e.message }; }
 });
 ipcMain.on('start', start);
 ipcMain.on('stop', stop);
 ipcMain.handle('get-state', () => ({ state, players: [...players.values()] }));
 
 app.whenReady().then(() => {
-  SERVER_DIR = loadDir();
+  SERVER_DIR = loadDir(); STEAMCMD_DIR = loadPaths().steamcmd || '';
   createWindow();
   if (process.argv.includes('--autostart')) win.webContents.once('did-finish-load', start);
 });
+app.on('before-quit', () => { if (installing) installing.kill(); });
 app.on('before-quit', e => { if (proc) { e.preventDefault(); stop(); proc.once('exit', () => app.quit()); } });
 app.on('window-all-closed', () => app.quit());
