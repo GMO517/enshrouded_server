@@ -211,6 +211,31 @@ ipcMain.handle('backup-delete', (_e, name) => {
   try { fs.rmSync(bakPath(name), { recursive: true }); return { ok: true }; }
   catch (e) { return { ok: false, error: '刪除失敗:' + e.message }; }
 });
+// ---------- 連線資訊與防火牆 ----------
+const RULE = 'Enshrouded Server Tool';
+function queryPort() {
+  try { return JSON.parse(fs.readFileSync(CFG(), 'utf8').replace(/^﻿/, '')).queryPort || 15637; } catch { return 15637; }
+}
+const publicIp = () => new Promise(res => {
+  const req = require('https').get('https://api.ipify.org', r => { let b = ''; r.on('data', d => b += d); r.on('end', () => res(/^[\d.]+$/.test(b.trim()) ? b.trim() : '')); });
+  req.on('error', () => res('')); req.setTimeout(5000, () => req.destroy());
+});
+// 已放行 = 有本工具建的規則、針對 enshrouded_server.exe 的入站規則,或放行這個連接埠的入站 UDP 規則(最後一項很慢,放最後)
+const fwOpen = port => new Promise(res => execFile('powershell', ['-NoProfile', '-Command',
+  `$p='${port}'; if(Get-NetFirewallRule -DisplayName '${RULE}' -ErrorAction SilentlyContinue){1;exit}; $r=Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow; $ok=$r|%{$_.Name}; if(@(Get-NetFirewallApplicationFilter -All|?{$_.Program -like '*enshrouded_server.exe' -and $ok -contains $_.InstanceID}).Count){1;exit}; @($r|Get-NetFirewallPortFilter|?{$_.Protocol -in 'UDP','Any' -and $_.LocalPort -contains $p}).Count`],
+  { windowsHide: true }, (e, out) => res(!e && +out.trim() > 0)));
+ipcMain.handle('get-net', async () => ({ ip: await publicIp(), port: queryPort() }));
+ipcMain.handle('check-firewall', () => fwOpen(queryPort()));
+// 建立規則需要系統管理員權限,會跳出 UAC 視窗
+ipcMain.handle('add-firewall', async () => {
+  const port = queryPort();
+  const inner = `New-NetFirewallRule -DisplayName '${RULE}' -Direction Inbound -Protocol UDP -LocalPort ${port} -Action Allow`;
+  const enc = Buffer.from(inner, 'utf16le').toString('base64');
+  await new Promise(res => execFile('powershell', ['-NoProfile', '-Command',
+    `Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-EncodedCommand','${enc}'`], { windowsHide: true }, () => res()));
+  return { ok: await fwOpen(port) };
+});
+
 ipcMain.on('start', start);
 ipcMain.on('stop', stop);
 ipcMain.handle('get-state', () => ({ state, players: [...players.values()] }));

@@ -28,6 +28,7 @@ ul{margin:0;padding-left:20px;min-height:24px}
 #log{font:12px Consolas,monospace;height:220px;overflow:auto;background:#080d15;border-radius:6px;padding:8px;white-space:pre-wrap;color:#b8c6dc}
 .row{display:grid;grid-template-columns:190px 1fr 56px;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 h3+.row{border-top:0}
+.row.w{grid-template-columns:190px 1fr auto}
 .row label{cursor:help;text-decoration:underline dotted #567}.row .ctl{display:flex;gap:8px;align-items:center}
 .row .ctl input[type=range]{flex:1;accent-color:var(--ac)}
 input[type=text],input[type=number],select{background:var(--panel2);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font:inherit}
@@ -55,6 +56,10 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
  <section class="page on" id="p-console">
   <h2>控制台</h2>
   <div class="card big"><div class="s" id="status2">未啟動</div><button class="b go" id="start">一鍵開服</button><button class="b stop" id="stop" disabled>關閉伺服器</button></div>
+  <div class="card"><h3>連線</h3>
+   <div class="row w"><label data-tip="朋友在遊戲裡搜尋伺服器名稱,或輸入這個位址。外網朋友要連進來,路由器需把 UDP 連接埠(預設 15637)轉發到這台電腦;連不上可改用 Radmin 或 Tailscale。">連線位址</label><div class="ctl"><b id="addr">取得中…</b></div><button class="b sm" id="copy" disabled>複製</button></div>
+   <div class="row w"><label data-tip="伺服器這台電腦的 Windows 防火牆要放行 UDP 連接埠(預設 15637)。按鈕會要求系統管理員授權,並建立放行規則。">防火牆</label><div class="ctl"><span id="fwst">檢查中…</span></div><button class="b sm" id="fw" disabled>放行 UDP</button></div>
+  </div>
   <div id="err" class="err"></div>
   <div class="card"><h3>在線成員 (<span id="n">0</span>)</h3><ul id="players"></ul></div>
   <div class="card"><h3>記錄</h3><div id="log"></div></div>
@@ -440,6 +445,22 @@ async function act(fn,okText){
 }
 $('bk').onclick=()=>act(()=>api.backupCreate(),'已備份');
 
+// ---------- 連線資訊 ----------
+async function refreshNet(){
+  const n=await api.getNet();
+  $('addr').textContent=n.ip?n.ip+':'+n.port:'無法取得公網 IP,請檢查網路';
+  $('copy').disabled=!n.ip;
+}
+$('copy').onclick=()=>{
+  navigator.clipboard.writeText($('addr').textContent);
+  $('copy').textContent='已複製';setTimeout(()=>$('copy').textContent='複製',1500);
+};
+function setFw(ok){$('fwst').textContent=ok?'已放行':'未放行';$('fwst').className=ok?'okc':'wac';$('fw').disabled=ok}
+$('fw').onclick=async()=>{
+  $('fw').disabled=true;$('fwst').className='';$('fwst').textContent='等待系統管理員授權…';
+  setFw((await api.addFirewall()).ok);
+};
+
 api.getState().then(s=>{setState(s.state);setPlayers(s.players)});
-loadCfg();refreshPaths();renderBackups();
+loadCfg();refreshPaths();renderBackups();refreshNet();api.checkFirewall().then(setFw);
 </script></body></html>
