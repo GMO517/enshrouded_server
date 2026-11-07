@@ -16,6 +16,11 @@ main{display:flex;flex-direction:column;min-width:0;height:100vh}
 .page{display:none;max-width:760px}.page.on{display:block}
 h2{font-size:17px;margin:0 0 14px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+summary{cursor:pointer;color:var(--ac);font-size:14px;font-weight:bold;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";display:inline-block;width:1.2em;transition:transform .15s}
+details[open]>summary::before{transform:rotate(90deg)}
+details[open]>summary{margin-bottom:10px}
 .card>h3{font-size:14px;margin:0 0 10px;color:var(--ac)}
 button.b{font:inherit;border:0;border-radius:8px;padding:9px 18px;cursor:pointer;color:#fff;background:#34445f}
 button.b:hover:not(:disabled){filter:brightness(1.15)}button.b:disabled{opacity:.4;cursor:default}
@@ -56,12 +61,12 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
  <section class="page on" id="p-console">
   <h2>控制台</h2>
   <div class="card big"><div class="s" id="status2">未啟動</div><button class="b go" id="start">一鍵開服</button><button class="b stop" id="stop" disabled>關閉伺服器</button></div>
-  <div class="card"><h3>連線</h3>
-   <div class="row w"><label data-tip="朋友在遊戲裡搜尋伺服器名稱,或輸入這個位址。外網朋友要連進來,路由器需把 UDP 連接埠(預設 15637)轉發到這台電腦;連不上可改用 Radmin 或 Tailscale。">連線位址</label><div class="ctl"><b id="addr">取得中…</b></div><button class="b sm" id="copy" disabled>複製</button></div>
-   <div class="row w"><label data-tip="伺服器這台電腦的 Windows 防火牆要放行 UDP 連接埠(預設 15637)。按鈕會要求系統管理員授權,並建立放行規則。">防火牆</label><div class="ctl"><span id="fwst">檢查中…</span></div><button class="b sm" id="fw" disabled>放行 UDP</button></div>
-  </div>
+  <details class="card"><summary data-tip="在遊戲的「搜尋 IPv4」輸入這些位址就能連到伺服器。Radmin / Tailscale 的位址要雙方都加入同一個虛擬網路才有用。朋友也可以在你進入伺服器後,從 Steam 好友清單加入你。">連線位址</summary>
+   <div id="addrs"></div>
+   <div class="row w"><label data-tip="用位址(本機以外)連進來時,伺服器這台電腦的 Windows 防火牆要放行 UDP 連接埠(預設 15637)。按鈕會要求系統管理員授權,並建立放行規則。">防火牆</label><div class="ctl"><span id="fwst">檢查中…</span></div><button class="b sm" id="fw" disabled>放行 UDP</button></div>
+  </details>
   <div id="err" class="err"></div>
-  <div class="card"><h3>在線成員 (<span id="n">0</span>)</h3><ul id="players"></ul></div>
+  <details class="card"><summary>在線成員 (<span id="n">0</span>)</summary><ul id="players"></ul></details>
   <div class="card"><h3>記錄</h3><div id="log"></div></div>
  </section>
  <section class="page" id="p-settings">
@@ -112,7 +117,7 @@ function setPlayers(p){
   p.forEach(n=>$('players').appendChild(el('li',{textContent:n})));
 }
 $('start').onclick=()=>{$('err').textContent='';api.start()};
-$('stop').onclick=()=>api.stop();
+$('stop').onclick=()=>{if(confirm('確定要關閉伺服器嗎?在線的玩家會被中斷,關閉時會先存檔。'))api.stop()};
 api.on('state',setState);api.on('players',setPlayers);
 api.on('error',m=>$('err').textContent=m);
 api.on('log',l=>{const d=$('log');d.textContent+=l+'\n';if(d.textContent.length>20000)d.textContent=d.textContent.slice(-10000);d.scrollTop=d.scrollHeight});
@@ -447,14 +452,15 @@ $('bk').onclick=()=>act(()=>api.backupCreate(),'已備份');
 
 // ---------- 連線資訊 ----------
 async function refreshNet(){
-  const n=await api.getNet();
-  $('addr').textContent=n.ip?n.ip+':'+n.port:'無法取得公網 IP,請檢查網路';
-  $('copy').disabled=!n.ip;
+  const box=$('addrs');box.innerHTML='';
+  (await api.getNet()).forEach(n=>{
+    const r=el('div',{className:'row w'}),b=el('button',{className:'b sm',textContent:'複製'});
+    b.onclick=()=>{navigator.clipboard.writeText(n.addr);b.textContent='已複製';setTimeout(()=>b.textContent='複製',1500)};
+    r.append(el('label',{textContent:n.label,style:'cursor:default;text-decoration:none'}),el('div',{className:'ctl',innerHTML:''}),b);
+    r.children[1].appendChild(el('b',{textContent:n.addr}));
+    box.appendChild(r);
+  });
 }
-$('copy').onclick=()=>{
-  navigator.clipboard.writeText($('addr').textContent);
-  $('copy').textContent='已複製';setTimeout(()=>$('copy').textContent='複製',1500);
-};
 function setFw(ok){$('fwst').textContent=ok?'已放行':'未放行';$('fwst').className=ok?'okc':'wac';$('fw').disabled=ok}
 $('fw').onclick=async()=>{
   $('fw').disabled=true;$('fwst').className='';$('fwst').textContent='等待系統管理員授權…';

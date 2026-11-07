@@ -71,6 +71,15 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true }
   });
   win.setMenuBarVisibility(false);
+  // 伺服器執行中或正在安裝時,關視窗會連帶中斷,先確認以防手滑
+  win.on('close', e => {
+    if (!proc && !installing) return;
+    const r = dialog.showMessageBoxSync(win, {
+      type: 'warning', buttons: ['取消', '關閉'], defaultId: 0, cancelId: 0, title: '確認關閉',
+      message: proc ? '伺服器還在執行,關閉視窗會一併關閉伺服器(會先存檔)。確定要關閉嗎?' : '正在安裝或更新,關閉視窗會中斷。確定要關閉嗎?'
+    });
+    if (r === 0) e.preventDefault();
+  });
   win.loadFile('index.html');
 }
 
@@ -216,15 +225,18 @@ const RULE = 'Enshrouded Server Tool';
 function queryPort() {
   try { return JSON.parse(fs.readFileSync(CFG(), 'utf8').replace(/^﻿/, '')).queryPort || 15637; } catch { return 15637; }
 }
-const publicIp = () => new Promise(res => {
-  const req = require('https').get('https://api.ipify.org', r => { let b = ''; r.on('data', d => b += d); r.on('end', () => res(/^[\d.]+$/.test(b.trim()) ? b.trim() : '')); });
-  req.on('error', () => res('')); req.setTimeout(5000, () => req.destroy());
-});
 // 已放行 = 有本工具建的規則、針對 enshrouded_server.exe 的入站規則,或放行這個連接埠的入站 UDP 規則(最後一項很慢,放最後)
 const fwOpen = port => new Promise(res => execFile('powershell', ['-NoProfile', '-Command',
   `$p='${port}'; if(Get-NetFirewallRule -DisplayName '${RULE}' -ErrorAction SilentlyContinue){1;exit}; $r=Get-NetFirewallRule -Direction Inbound -Enabled True -Action Allow; $ok=$r|%{$_.Name}; if(@(Get-NetFirewallApplicationFilter -All|?{$_.Program -like '*enshrouded_server.exe' -and $ok -contains $_.InstanceID}).Count){1;exit}; @($r|Get-NetFirewallPortFilter|?{$_.Protocol -in 'UDP','Any' -and $_.LocalPort -contains $p}).Count`],
   { windowsHide: true }, (e, out) => res(!e && +out.trim() > 0)));
-ipcMain.handle('get-net', async () => ({ ip: await publicIp(), port: queryPort() }));
+// 遊戲內「搜尋 IPv4」可用的位址:本機、區網、Radmin 等虛擬網路(公網 IP 實測搜不到,所以不列)
+ipcMain.handle('get-net', () => {
+  const port = queryPort(), list = [{ label: '本機', addr: '127.0.0.1:' + port }];
+  for (const [name, ifs] of Object.entries(require('os').networkInterfaces()))
+    for (const i of ifs) if (i.family === 'IPv4' && !i.internal && !i.address.startsWith('169.254.'))
+      list.push({ label: /radmin/i.test(name) ? 'Radmin VPN' : /tailscale/i.test(name) ? 'Tailscale' : '區網', addr: i.address + ':' + port });
+  return list;
+});
 ipcMain.handle('check-firewall', () => fwOpen(queryPort()));
 // 建立規則需要系統管理員權限,會跳出 UAC 視窗
 ipcMain.handle('add-firewall', async () => {
