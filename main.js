@@ -17,7 +17,7 @@ const APP_ID = '2278520'; // Enshrouded Dedicated Server
 const EXE = () => path.join(SERVER_DIR, 'enshrouded_server.exe');
 const CFG = () => path.join(SERVER_DIR, 'enshrouded_server.json');
 
-let win, proc = null, state = 'stopped', installing = null;
+let forceClose = false, win, proc = null, state = 'stopped', installing = null;
 let players = new Map(); // index -> name
 let pendingIdx = null;
 
@@ -73,12 +73,9 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   // 伺服器執行中或正在安裝時,關視窗會連帶中斷,先確認以防手滑
   win.on('close', e => {
-    if (!proc && !installing) return;
-    const r = dialog.showMessageBoxSync(win, {
-      type: 'warning', buttons: ['取消', '關閉'], defaultId: 0, cancelId: 0, title: '確認關閉',
-      message: proc ? '伺服器還在執行,關閉視窗會一併關閉伺服器(會先存檔)。確定要關閉嗎?' : '正在安裝或更新,關閉視窗會中斷。確定要關閉嗎?'
-    });
-    if (r === 0) e.preventDefault();
+    if (forceClose || (!proc && !installing)) return;
+    e.preventDefault();
+    send('confirm-close', proc ? 'server' : 'install');
   });
   win.loadFile('index.html');
 }
@@ -248,6 +245,7 @@ ipcMain.handle('add-firewall', async () => {
   return { ok: await fwOpen(port) };
 });
 
+ipcMain.on('force-close', () => { forceClose = true; win.close(); });
 ipcMain.on('start', start);
 ipcMain.on('stop', stop);
 ipcMain.handle('get-state', () => ({ state, players: [...players.values()] }));

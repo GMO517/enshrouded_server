@@ -48,6 +48,11 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
 .empty{color:var(--mu);padding:4px 0}
 #bar{display:none;align-items:center;gap:14px;padding:10px 24px;background:#0a101a;border-top:1px solid var(--line)}
 #bar.on{display:flex}#bar .m{flex:1;white-space:pre-wrap;font-size:13px}
+#modal{display:none;position:fixed;inset:0;background:#0009;align-items:center;justify-content:center;z-index:90}
+#modal.on{display:flex}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;min-width:280px;max-width:420px;box-shadow:0 8px 32px #000a}
+#modal #mmsg{font-size:15px;margin-bottom:18px}
+#modal .acts{display:flex;justify-content:flex-end;gap:10px}
 #tip{position:fixed;display:none;max-width:300px;background:#080d15;color:var(--tx);border:1px solid var(--ac);border-radius:6px;padding:7px 10px;font-size:13px;white-space:pre-wrap;z-index:99;pointer-events:none}
 @media (prefers-reduced-motion:no-preference){button.b{transition:filter .15s}}
 </style></head><body>
@@ -86,6 +91,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
 </div>
 <div id="bar"><div class="m" id="msg"></div><button class="b pri" id="save">儲存設定</button></div>
 </main>
+<div id="modal"><div class="box"><div id="mmsg"></div><div class="acts"><button class="b" id="mno">取消</button><button class="b stop" id="myes">確定</button></div></div></div>
 <div id="tip"></div>
 <script>
 const $=id=>document.getElementById(id);
@@ -100,6 +106,16 @@ function show(p){
 }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.p));
 
+function ask(msg,ok='確定'){
+  return new Promise(res=>{
+    $('mmsg').textContent=msg;$('myes').textContent=ok;$('modal').classList.add('on');$('mno').focus();
+    const key=e=>{if(e.key==='Escape')done(false)};
+    const done=v=>{$('modal').classList.remove('on');document.removeEventListener('keydown',key);res(v)};
+    document.addEventListener('keydown',key);
+    $('myes').onclick=()=>done(true);$('mno').onclick=()=>done(false);
+  });
+}
+api.on('confirm-close',k=>ask(k==='server'?'關閉視窗會一併關閉伺服器。':'關閉視窗會中斷安裝。','關閉').then(ok=>ok&&api.forceClose()));
 function el(tag,props){return Object.assign(document.createElement(tag),props||{})}
 function setState(s){
   curState=s;
@@ -117,7 +133,7 @@ function setPlayers(p){
   p.forEach(n=>$('players').appendChild(el('li',{textContent:n})));
 }
 $('start').onclick=()=>{$('err').textContent='';api.start()};
-$('stop').onclick=()=>{if(confirm('確定要關閉伺服器嗎?在線的玩家會被中斷,關閉時會先存檔。'))api.stop()};
+$('stop').onclick=async()=>{if(await ask('關閉伺服器?','關閉'))api.stop()};
 api.on('state',setState);api.on('players',setPlayers);
 api.on('error',m=>$('err').textContent=m);
 api.on('log',l=>{const d=$('log');d.textContent+=l+'\n';if(d.textContent.length>20000)d.textContent=d.textContent.slice(-10000);d.scrollTop=d.scrollHeight});
@@ -374,12 +390,12 @@ async function loadCfg(){
   cfg=r.config;snap=JSON.stringify(cfg);dirty=false;say('');
   buildForm();renderGroups();renderBans();applyLock();
 }
-$('reload').onclick=()=>{
-  if(dirty&&!confirm('有尚未儲存的修改,重新讀檔會全部丟掉。繼續嗎?'))return;
+$('reload').onclick=async()=>{
+  if(dirty&&!await ask('重新讀檔會丟掉未儲存的修改。','重新讀檔'))return;
   loadCfg();
 };
 $('choose').onclick=async()=>{
-  if(dirty&&!confirm('有尚未儲存的修改,更換資料夾會全部丟掉。繼續嗎?'))return;
+  if(dirty&&!await ask('更換資料夾會丟掉未儲存的修改。'))return;
   const r=await api.chooseDir();
   if(r.error)say(r.error,'err');
   if(r.ok)loadCfg();
@@ -389,7 +405,7 @@ document.addEventListener('input',()=>{if(note&&dirty)say('')},true);
 $('save').onclick=async()=>{
   let r=await api.saveConfig({config:cfg});
   if(r.conflict){
-    if(!confirm('設定檔在你載入之後被其他程式修改過。要用目前畫面的內容覆蓋嗎?(舊檔會先備份)'))return;
+    if(!await ask('設定檔已被其他程式修改,要覆蓋嗎?','覆蓋'))return;
     r=await api.saveConfig({config:cfg,force:true});
   }
   if(!r.ok){say(r.errors.join('\n'),'err');return}
@@ -435,8 +451,8 @@ async function renderBackups(){
       [i.name,new Date(i.time).toLocaleString('zh-TW',{hour12:false}),fmtSize(i.size)].forEach(x=>tr.appendChild(el('td',{textContent:x})));
       const td=el('td');
       const rs=el('button',{className:'b sm',textContent:'還原'}),dl=el('button',{className:'b sm stop',textContent:'刪除'});
-      rs.onclick=()=>act(()=>confirm('要用「'+i.name+'」覆蓋目前的地圖嗎?\n(會先自動備份一份目前的地圖)')&&api.backupRestore(i.name),'已還原');
-      dl.onclick=()=>act(()=>confirm('要刪除備份「'+i.name+'」嗎?刪除後無法復原。')&&api.backupDelete(i.name),'已刪除');
+      rs.onclick=()=>act(async()=>await ask('還原「'+i.name+'」?目前地圖會先自動備份。','還原')&&api.backupRestore(i.name),'已還原');
+      dl.onclick=()=>act(async()=>await ask('刪除「'+i.name+'」?無法復原。','刪除')&&api.backupDelete(i.name),'已刪除');
       td.append(rs,' ',dl);tr.appendChild(td);t.appendChild(tr);
     });
     c.appendChild(t);

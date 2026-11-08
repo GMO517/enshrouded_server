@@ -16,5 +16,6 @@ contextBridge.exposeInMainWorld('api', {
   backupCreate: () => ipcRenderer.invoke('backup-create'),
   backupRestore: n => ipcRenderer.invoke('backup-restore', n),
   backupDelete: n => ipcRenderer.invoke('backup-delete', n),
+  forceClose: () => ipcRenderer.send('force-close'),
   on: (ch, fn) => ipcRenderer.on(ch, (_e, d) => fn(d))
 });
