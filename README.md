@@ -2,6 +2,10 @@
 
 Windows 上的霧鎖王國(Enshrouded)專用伺服器管理工具,一鍵開服、關服,可以改設定、管身分組與黑名單、備份地圖。
 
+## 下載
+
+到 [Releases 頁面](https://github.com/GMO517/enshrouded_server/releases/latest),在最新版本下方的 Assets 找到 `EnshroudedServerTool.exe`,點它下載,下載後雙擊就能用,不需要安裝。(找不到的話,點頁面右側欄的 Releases。)
+
 ## 使用
 
 1. 到 Valve 下載 [SteamCMD](https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip),解壓縮到任意資料夾。
